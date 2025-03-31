@@ -31,7 +31,7 @@ const GameComponent = () => {
                 noAudio: false,
                 contextResume: true // Allow context resuming
             },
-        scene: [StartScene,StoryPanelScene,tanyaradzwaScene,GameScene,UIScene,transitionScene,FinalScene,GameOverScene],
+        scene: [FinalScene],
      
             parent: 'game-container' // Matches the div below
         };

@@ -145,19 +145,32 @@ class FinalScene extends Phaser.Scene
         // Physics
         this.physics.add.existing(this.plane);
 
-        // Bullet group
-        this.bullets = this.physics.add.group({
-            defaultKey: 'bullet1',
-            maxSize: 10,
-            runChildUpdate: true,
-            createCallback: (bullet) => {
-                // This ensures each bullet gets a physics body
-                this.physics.add.existing(bullet);
-                bullet.body.setAllowGravity(false);
-                bullet.body.onWorldBounds = true;
-            }
+// 1. Create the bullet group
+this.bullets = this.physics.add.group({
+    defaultKey: 'bullet1',
+    maxSize: 30,
+    runChildUpdate: true,
+    createCallback: (bullet) => {
+        this.physics.add.existing(bullet);
+        bullet.body.setAllowGravity(false);
+        bullet.setActive(false).setVisible(false); // Start inactive
+        
+        // Set default properties (velocity will be set when fired)
+        bullet.setScale(0.3);
+        bullet.setDepth(1);
+    }
+});
+        
+        this.anims.create({
+            key: 'bulletAnim', // Changed from 'bullets' to be more specific
+            frames: [
+                { key: 'bullet1' },
+                { key: 'bullet2' },
+            ],
+            frameRate: 10,
+            repeat: -1
         });
-
+     
         // Touch controls
         this.input.addPointer(1);
         this.touchY = 300;
@@ -199,7 +212,7 @@ class FinalScene extends Phaser.Scene
             createCallback: bullet => {
                 this.physics.add.existing(bullet);
                 bullet.body.setAllowGravity(false);
-                bullet.setScale(2);
+                bullet.setScale(0.5);
             }
         });
 
@@ -325,21 +338,35 @@ class FinalScene extends Phaser.Scene
         this.dragonBullets.clear(true, true);
         console.log('Dragon firing stopped and bullets cleared');
     }
-    dragonFire() {
+    dragonFire(pattern = 'single') {
         if (!this.dragon?.active || this.gameOver) return;
-
-        const bullet = this.dragonBullets.get();
-        if (bullet) {
-            bullet.setActive(true)
-                .setVisible(true)
-                .setPosition(this.dragon.x - 30, this.dragon.y) // Offset from dragon
-                .setVelocityX(this.dragonFireSpeed); // Negative for leftward movement
-
-            // Clean up off-screen bullets
-            this.time.delayedCall(3000, () => {
-                if (bullet.active) bullet.setActive(false).setVisible(false);
-            });
+    
+        switch(pattern) {
+            case 'single':
+                this.fireSingleBullet();
+                break;
+            case 'spread':
+                this.fireSpread(3, 30); // 3 bullets at 30 degree spread
+                break;
+            case 'wave':
+                this.fireWave(5, 100); // 5 bullets in a wave pattern
+                break;
+            case 'burst':
+                this.fireBurst(3, 200); // 3 quick bursts
+                break;
         }
+    }
+    
+    // Then modify startDragonFiring to accept pattern:
+    startDragonFiring(pattern = 'single', rate = 1000) {
+        if (this.dragonFireTimer) this.dragonFireTimer.destroy();
+        
+        this.dragonFireTimer = this.time.addEvent({
+            delay: rate,
+            callback: () => this.dragonFire(pattern),
+            callbackScope: this,
+            loop: true
+        });
     }
 
     startDragonFiring() {
@@ -350,8 +377,61 @@ class FinalScene extends Phaser.Scene
             loop: true
         });
     }
-
-
+    fireBurst(count = 3, delayBetween = 200) {
+        for (let i = 0; i < count; i++) {
+            this.time.delayedCall(i * delayBetween, () => {
+                const bullet = this.dragonBullets.get();
+                if (bullet) {
+                    bullet.setActive(true)
+                        .setVisible(true)
+                        .setPosition(this.dragon.x - 30, this.dragon.y)
+                        .setVelocityX(this.dragonFireSpeed);
+                    
+                    this.setBulletLifetime(bullet);
+                }
+            });
+        }
+    }
+    fireWave(count = 5, waveSize = 100) {
+        for (let i = 0; i < count; i++) {
+            this.time.delayedCall(i * 150, () => {
+                const bullet = this.dragonBullets.get();
+                if (bullet) {
+                    const offsetY = waveSize * Math.sin(i * 0.5);
+                    
+                    bullet.setActive(true)
+                        .setVisible(true)
+                        .setPosition(this.dragon.x - 30, this.dragon.y + offsetY)
+                        .setVelocityX(this.dragonFireSpeed);
+                    
+                    this.setBulletLifetime(bullet);
+                }
+            });
+        }
+    }
+    fireSpread(count = 3, angleSpread = 30) {
+        const centerAngle = 180; // Firing left (adjust as needed)
+        const angleStep = angleSpread / (count - 1);
+        const startAngle = centerAngle - (angleSpread / 2);
+    
+        for (let i = 0; i < count; i++) {
+            const bullet = this.dragonBullets.get();
+            if (bullet) {
+                const angle = Phaser.Math.DegToRad(startAngle + (i * angleStep));
+                const speed = this.dragonFireSpeed;
+                
+                bullet.setActive(true)
+                    .setVisible(true)
+                    .setPosition(this.dragon.x - 30, this.dragon.y)
+                    .setVelocity(
+                        Math.cos(angle) * speed,
+                        Math.sin(angle) * speed
+                    );
+                
+                this.setBulletLifetime(bullet);
+            }
+        }
+    }
     createHealthDisplay() {
         this.healthText = this.add.text(20, 20, 'Dragon Health: 100', {
             fontSize: '24px',
@@ -532,21 +612,16 @@ class FinalScene extends Phaser.Scene
             }
         }
     }
-
-    startAutoFire() {
-        // If there's already a firing loop, stop it first
-        if (this.fireLoop) {
-            this.fireLoop.remove();
-        }
-
-        // Create new firing loop
-        this.fireLoop = this.time.addEvent({
-            delay: this.fireRate,
-            callback: this.fireBullet,
-            callbackScope: this,
-            loop: true
-        });
-    }
+// Start/stop:
+startAutoFire() {
+    if (this.fireLoop) this.fireLoop.destroy();
+    this.fireLoop = this.time.addEvent({
+        delay: 500,
+        callback: this.fireBullet,
+        callbackScope: this,
+        loop: true
+    });
+}
 
     stopAutoFire() {
         if (this.fireLoop) {
@@ -554,36 +629,35 @@ class FinalScene extends Phaser.Scene
             this.fireLoop = null;
         }
     }
-    fireBullet() {
-        // Create bullet at plane's position (slightly ahead)
-        const bullet = this.bullets.get(this.plane.x + 40, this.plane.y);
-
-        if (bullet) {
-            bullet.setScale(0.3) // Adjust bullet size
-                .setDepth(1); // Render above other objects
-
-            // Alternate between bullet sprites for visual effect
-            const bulletTexture = Phaser.Math.RND.pick(['bullet1', 'bullet2']);
-            bullet.setTexture(bulletTexture);
-            bullet.setActive(true).setVisible(true);
-
-            // Create muzzle flash effect
-            const flash = this.add.sprite(this.plane.x + 20, this.plane.y, bulletTexture)
-                .setScale(1)
-                .setAlpha(0.8)
-                .setDepth(0);
-
-            // Animate flash
-            this.tweens.add({
-                targets: flash,
-                scale: 0.5,
-                alpha: 0,
-                duration: 100,
-                onComplete: () => flash.destroy()
-            });
-        }
+// In your fireBullet() function:
+fireBullet() {
+    const bullet = this.bullets.get(this.plane.x + 40, this.plane.y);
+    
+    if (bullet) {
+        // Reset bullet properties
+        bullet.setActive(true)
+              .setVisible(true)
+              .setPosition(this.plane.x + 40, this.plane.y)
+              .setVelocityX(500); // Set velocity here instead of createCallback
+        
+        // Play animation on THIS bullet
+        bullet.play('bulletAnim');
+        
+        // Muzzle flash effect (optional)
+        const flash = this.add.sprite(this.plane.x + 20, this.plane.y, 'bullet1')
+            .setScale(1)
+            .setAlpha(0.8)
+            .setDepth(0);
+        
+        this.tweens.add({
+            targets: flash,
+            scale: 0.5,
+            alpha: 0,
+            duration: 100,
+            onComplete: () => flash.destroy()
+        });
     }
-
+}
 
 }
 
