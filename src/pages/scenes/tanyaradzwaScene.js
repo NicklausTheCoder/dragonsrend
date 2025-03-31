@@ -40,7 +40,7 @@ export default class tanyaradzwaScene extends Phaser.Scene {
 
         const panel = this.add.rectangle(50, 220, 500, 300, 0x333333 , 0.9)
         .setOrigin(0.5);
-        this.potion = this.add.image(260, 500, 'tanya').setScale(0.8);
+        this.potion = this.add.image(300, 550, 'tanya').setScale(0.6);
 
     const fullText = 'My name is Sanjay Kurosaki, I trained my entire life to be a dragon hunter. Since its the modern world we use what we can, Master Shifu has given me the task to hunt the legendary dragon BAJIN THE ENDER';
     

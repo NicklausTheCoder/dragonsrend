@@ -1,63 +1,70 @@
 import Phaser from 'phaser';
 
-export default class StoryPanelScene extends Phaser.Scene {
+export default class victoryScene extends Phaser.Scene {
     constructor() {
-        super('StoryPanelScene');
+        super('victoryScene');
     }
 
     preload() {
         // Load button image (or use a text button)
 
-        this.load.image('bajin', 'baji.png');
+        this.load.image('millitary', 'town.jpg');
         // Optional: Load sound for button click
-        this.load.image('master', 'master.png');
+        this.load.image('tanya', 'tanya.png');
 
     }
 
     create() {
-        // Add background or styling
-        const gameWidth = this.cameras.main.width;
-        const gameHeight = this.cameras.main.height;
-        
+        const gameWidth = this.scale.width;
+        const gameHeight = this.scale.height;
+        const imgWidth = 500;   // Original image width
+        const imgHeight = 888;  // Original image height
+    
+        // Calculate scale to COVER the screen (no empty areas)
+        const scaleX = gameWidth / imgWidth;
+        const scaleY = gameHeight / imgHeight;
+        const scale = Math.max(scaleX, scaleY); // Ensures full coverage
+    
+        // Create the background (centered)
         this.background = this.add.tileSprite(
-            0, 0,           // Top-left corner
-            gameWidth,      // Match screen width
-            gameHeight,     // Match screen height
-            'bajin'           // Texture key
+            gameWidth / 2,      // Center X
+            gameHeight / 2,     // Center Y
+            imgWidth,           // Original width (500)
+            imgHeight,          // Original height (888)
+            'millitary'      // Key of the loaded image
         )
-        .setOrigin(0, 0);   // Align to top-left
+        .setScale(scale)        // Apply the correct scale
+        .setOrigin(0.5, 0.5);  // Center the sprite
+
         
-        // Adjust tiling scale to prevent stretching
-        this.background.setTileScale(
-            gameWidth / 1200,   // Scale X
-            gameHeight / 2000    // Scale Y
-        );
-
-
-
-
-        const panel = this.add.rectangle(50, 550, 500, 300, 0x333333 , 0.9)
+   
+        const panel = this.add.rectangle(50, 220, 500, 300, 0x333333 , 0.9)
         .setOrigin(0.5);
-        this.potion = this.add.image(260, 500, 'master').setScale(0.6);
-    // 3. Add your text - CHANGE THIS TEXT TO WHAT YOU WANT
+        this.potion = this.add.image(300, 550, 'tanya').setScale(0.6);
 
-
-    const fullText = 'The great dragon BAJIN has awakaned,And even more unfortunate it has threatened to destroy our town of ASAKUSA, I have chose you Sanjay!! Go find it and exterminate the vile beast';
+    const fullText = 'At last the Dragon is Dead the dragon is dead and the town is safe that was quite the battle!!';
     
     // Create an initially empty text object
-    const text = this.add.text(150, 500, '', {
+    const text = this.add.text(150, 200, '', {
         font: '18px Arial',
         color: '#ffffff',
-        align: 'center',
-        wordWrap: {
-            width: 250  // Maximum width in pixels before wrapping
-        },
-        align: 'left'
+           align: 'left',
+        wordWrap: { width: 250 }
+    }).setOrigin(0.5);
+    const fullWinText = 'You Win';
+    const textwin = this.add.text(150, 120, '', {
+        font: '28px Arial',
+        color: '#ffffff',
+           align: 'left',
+        wordWrap: { width: 250 }
     }).setOrigin(0.5);
 
+
+
     // Start the typewriter effect
+    this.typewriteText(textwin, fullWinText,30);
     this.typewriteText(text, fullText, 30);
-    const button = this.add.text(120, 620, 'Continue', {
+    const button = this.add.text(120, 320, 'The End', {
         fontFamily: 'Arial',  // Not 'font'
         fontSize: '32px',
         color: '#ffffff',     // Text color
@@ -85,7 +92,7 @@ export default class StoryPanelScene extends Phaser.Scene {
             
             // After fade completes, switch scene
             this.cameras.main.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () => {
-                this.scene.start('tanyaradzwaScene');
+                this.scene.start('startScene');
             });
         // Your button action here
     });

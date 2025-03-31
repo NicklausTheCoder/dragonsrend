@@ -8,6 +8,7 @@ import Phaser from 'phaser';
 import UIScene from './scenes/uiscene';
 import transitionScene from './scenes/transitionScene';
 import FinalScene from './scenes/FinalScene';
+import victoryScene from './scenes/victoryScene';
 
 const GameComponent = () => {
     const gameRef = useRef(null);
@@ -31,8 +32,8 @@ const GameComponent = () => {
                 noAudio: false,
                 contextResume: true // Allow context resuming
             },
-        scene: [FinalScene],
-     
+        scene: [StartScene,StoryPanelScene,tanyaradzwaScene,GameScene,UIScene,transitionScene,FinalScene,GameOverScene,victoryScene],
+      
             parent: 'game-container' // Matches the div below
         };
 

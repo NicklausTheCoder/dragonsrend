@@ -11,7 +11,7 @@ class GameScene extends Phaser.Scene {
         this.playerhealth = 0
         this.fireRate = 500;
     }
-    dragonHealth = 100;
+    dragonHealth = 200;
     background2;
 
 
@@ -50,7 +50,8 @@ class GameScene extends Phaser.Scene {
         this.playerhealth += 1
         this.background = this.add.tileSprite(0, 0, 1600, 700, 'sky');
         this.background.setOrigin(0, 0);
-
+        this.dragonMaxHealth = 200;
+        this.dragonCurrentHealth = this.dragonMaxHealth;
         // Create plane
         this.plane = this.add.sprite(45, 300, 'plane1');
         this.dragon = this.physics.add.sprite(this.cameras.main.width * 0.75, // Start at 75% of screen width (right side)
@@ -142,6 +143,10 @@ class GameScene extends Phaser.Scene {
         );
 
 
+        this.healthText = this.add.text(20, 20, 'Dragon Health: 200', {
+            fontSize: '24px',
+            fill: '#ffffff'
+        }).setScrollFactor(0);
 
 
         this.dragonBullets = this.physics.add.group({
@@ -172,7 +177,7 @@ class GameScene extends Phaser.Scene {
         this.physics.add.overlap(
             this.dragon,
             this.plane,
-            this.playerHit,
+            this.DragonRam,
             null,
             this
         );
@@ -220,7 +225,8 @@ class GameScene extends Phaser.Scene {
                     console.log('end explosion');
                 });
             });
-            this.startGameOver();
+
+            this.startGameOver(player);
         } else {
 
             this.scene.pause('GameScene');
@@ -313,14 +319,14 @@ class GameScene extends Phaser.Scene {
     }
     targetHit(bullet, dragon) {
         // Handle collision
-        dragon.setActive(false).setVisible(false);
+        bullet.destroy()
         this.dragonHealth -= 1;
         this.healthText.setText(`Dragon Health: ${this.dragonHealth}`);
         // Visual feedback
         dragon.setTint(0xff0000);
         this.time.delayedCall(200, () => dragon.clearTint());
 
-        console.log('Target hit!'); // For debugging
+  
         if (this.dragonHealth <= 0) {
             this.defeatDragon();
         }
@@ -368,7 +374,7 @@ class GameScene extends Phaser.Scene {
         
         this.cameras.main.once('camerafadeoutcomplete', () => {
             // Stop both scenes cleanly
-   
+            this.scene.stop('GameScene');
             this.scene.start('transitionScene', {
                 score: this.score ?? 0,
                 level: this.currentLevel ?? 1
@@ -429,7 +435,193 @@ class GameScene extends Phaser.Scene {
             this.dragonSpeed
         );
     }
+    createHearts() {
+        this.hearts = this.add.group();
+        
+        for (let i = 0; i < this.playerMaxHealth; i++) {
+            this.hearts.add(
+                this.add.sprite(20 + (i * 40),      this.cameras.main.height - 50 , 'heart')
+                .setScrollFactor(0)
+                .setScale(0.06)
+                .setDepth(1000));
+        }
+    }
+   updateHearts() {
+        this.hearts.getChildren().forEach((heart, index) => {
+            // Show full heart if index < current health
+            if (index < this.playerHealth) {
+                heart.setTexture('heart');
+            }
+            // Show empty heart (or hide) if health is depleted
+            else {
+                 heart.setVisible(false)
+            }
+        });
+    }
 
+     DragonRam(dragon, plane) {
+
+
+       
+        // Player hit effect
+
+
+
+        if (this.playerHealth > 0) {
+            this.playerHealth--;
+            console.log(this.playerHealth)
+            // Update visual hearts
+            this.updateHearts();
+
+            // Visual feedback
+            this.cameras.main.shake(200, 0.01); // Screen shake
+            plane.setTint(0xff0000);
+
+
+            this.time.delayedCall(300, () => {
+                plane.clearTint();
+            });
+  
+
+
+
+            // Check for game over
+            if (this.playerHealth <= 0) {
+              
+                this.startGameOver(plane);
+            }
+        }
+
+
+
+        // Add
+
+        // Add your player damage logic here
+        console.log('Player hit by dragon bullet!');
+        return false
+    }
+    startGameOver(plane) {
+
+        this.stopAutoFire();
+        this.stopDragonFiring();
+        const explosion = this.add.sprite(
+            plane.x,
+            plane.y,
+            'explosion1' // Make sure you loaded this texture
+        );
+
+        this.anims.create({
+            key: 'explode',
+            frames: [
+                { key: 'explosion1' },
+                { key: 'explosion2' },
+                { key: 'explosion3' },
+                { key: 'explosion4' },
+                { key: 'explosion5' },
+                { key: 'explosion6' }
+            ],
+            frameRate: 10,
+            repeat: -1
+        });
+  
+
+        // 3. Play explosion animation
+        explosion.play('explode'); // Set up this animation in create()
+
+        // 4. Hide dragon (after slight delay for overlap)
+        this.time.delayedCall(100, () => {
+            plane.destroy()
+            // 5. Destroy explosion after animation
+            this.time.delayedCall(600, () => {
+                explosion.destroy();
+                console.log('end explosion');
+            });
+        });
+        // Resume in case we were paused
+        this.scene.resume();
+
+        // Start fade out from GameScene's camera
+        this.cameras.main.fadeOut(1000, 0, 0, 0);
+
+        this.cameras.main.once('camerafadeoutcomplete', () => {
+            // Stop both scenes cleanly
+            this.scene.stop('PopupScene');
+            this.scene.start('GameOverScene', {
+                score: this.score ?? 0,
+                level: this.currentLevel ?? 1
+            });
+        });
+    }
+    createHealthDisplay() {
+        // Background (gray)
+        this.healthBarBg = this.add.rectangle(
+            20, 20,
+            200, 30,
+            0x333333
+        ).setOrigin(0, 0).setScrollFactor(0);
+
+        // Foreground (red) - will shrink as health decreases
+        this.healthBar = this.add.rectangle(
+            20, 20,
+            200, 30,
+            0xff0000
+        ).setOrigin(0, 0).setScrollFactor(0);
+
+
+    }
+    updateHealthBar() {
+        // Calculate new width (0-200)
+        const newWidth = 200 * (this.dragonHealth / this.dragonMaxHealth);
+
+        // Destroy old rectangle
+        this.healthBar.destroy();
+
+        // Create new rectangle with updated width
+        this.healthBar = this.add.rectangle(
+            20, 20,
+            newWidth, 30,
+            0xff0000
+        ).setOrigin(0, 0).setScrollFactor(0);
+
+        // Update text if exists
+        if (this.healthText) {
+            this.healthText.setText(`HP: ${this.dragonHealth}/${this.dragonMaxHealth}`);
+        }
+    }
+
+    updateHealth(damage) {
+        // Reduce health (never below 0)
+        this.dragonCurrentHealth = Math.max(0, this.dragonCurrentHealth - damage);
+
+        // Calculate new width
+        const healthPercent = this.dragonCurrentHealth / this.dragonMaxHealth;
+        this.healthBar.width = 200 * healthPercent;
+
+        // Visual feedback
+        this.tweens.add({
+            targets: this.healthBar,
+            fillColor: 0x990000,
+            duration: 100,
+            yoyo: true
+        });
+
+        // Return true if dead
+        return this.dragonCurrentHealth <= 0;
+    }
+    targetHit(bullet, dragon) {
+        // Handle collision
+        dragon.setActive(false).setVisible(false);
+        this.dragonHealth -= 1;
+        this.healthText.setText(`Dragon Health: ${this.dragonHealth}`);
+        // Visual feedback
+        dragon.setTint(0xff0000);
+        this.time.delayedCall(200, () => dragon.clearTint());
+        this.updateHealthBar();
+        console.log('Target hit!'); // For debugging
+        if (this.dragonHealth <= 0) {
+            this.defeatDragon();
+        }
+    }
     update(time) {
         // Move background to the left
         this.background.tilePositionX += this.gameSpeed;

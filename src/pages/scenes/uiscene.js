@@ -40,8 +40,10 @@ export default class UIScene extends Phaser.Scene {
         });
 
         const declineButton = this.createButton(250, 400, 'Decline', '#882222', () => {
-            this.cleanup(); // First close the popup
-            this.scene.get('GameScene').startGameOver(); // Tell GameScene to handle transition
+            this.cleanup();
+            // Get reference to the active plane from GameScene
+            const gameScene = this.scene.get('GameScene');
+            gameScene.startGameOver(gameScene.plane); // Pass the plane object
         });
         // Store references for cleanup
         this.popupElements = { bg, panel, text, drinkButton, declineButton };
