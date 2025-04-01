@@ -20,7 +20,7 @@ class FinalScene extends Phaser.Scene {
 
 
 
-            this.load.image('finalsky0', `MergedImages.png`);
+            this.load.image('finalsky', `mergedimages.png`);
      
 
         this.load.image('plane1', 'plane1.png');
@@ -51,6 +51,10 @@ class FinalScene extends Phaser.Scene {
 
     create() {
         // Background
+
+        this.background = this.add.tileSprite(0, 0, 1600, 700, 'finalsky');
+        this.background.setOrigin(0, 0);
+
         // milliseconds between shots
         this.startAutoFire();
 
@@ -64,32 +68,12 @@ class FinalScene extends Phaser.Scene {
 
         this.dragonMaxHealth = 400;
         this.dragonCurrentHealth = this.dragonMaxHealth;
-        const gameWidth = this.scale.width;
-        const gameHeight = this.scale.height;
-        const imgWidth = 999;   // Original image width
-        const imgHeight = 429;  // Original image height
 
-        // Calculate scale to COVER the screen (no empty areas)
-        const scaleX = gameWidth / imgWidth;
-        const scaleY = gameHeight / imgHeight;
-        const scale = Math.max(scaleX, scaleY); // Ensures full coverage
 
-        // Create the background (centered)
-        this.background = this.add.sprite(
-            gameWidth / 2,
-            gameHeight / 2,
-            'finalsky0' // Use first frame as default
-        )
-            .setScale(scale)        // Apply the correct scale
-            .setOrigin(0.5, 0.5);  // Center the sprite
+
+
 
  
-
-        // Scale to cover screen
-        this.scaleBackground();
-
-
-        // Create plane
         this.plane = this.add.sprite(45, 300, 'plane1');
         this.dragon = this.physics.add.sprite(this.cameras.main.width * 0.75, // Start at 75% of screen width (right side)
             this.cameras.main.height / 2, 'finalDragon1');
@@ -916,21 +900,10 @@ class FinalScene extends Phaser.Scene {
             this.dragonSpeed
         );
     }
-    scaleBackground() {
-        const gameWidth = this.cameras.main.width;
-        const gameHeight = this.cameras.main.height;
-        const scaleX = gameWidth / this.background.width;
-        const scaleY = gameHeight / this.background.height;
-        const scale = Math.max(scaleX, scaleY);
-        this.background.setScale(scale);
-    }
+
     update(time) {
         // Move background to the left
-        this.background.x -= 0.5;
-        if (this.background.x <= -this.background.displayWidth / 2) {
-            this.background.x = this.cameras.main.width;
-        }
-
+        this.background.tilePositionX += this.gameSpeed;
         // Touch controls
         if (this.input.activePointer.isDown) {
             this.touchY = this.input.activePointer.y;

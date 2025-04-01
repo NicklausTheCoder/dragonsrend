@@ -92,7 +92,7 @@ export default class victoryScene extends Phaser.Scene {
             
             // After fade completes, switch scene
             this.cameras.main.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () => {
-                this.scene.start('startScene');
+                this.scene.start('StartScene');
             });
         // Your button action here
     });
