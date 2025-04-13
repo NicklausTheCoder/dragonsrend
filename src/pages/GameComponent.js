@@ -7,6 +7,7 @@ import tanyaradzwaScene from './scenes/tanyaradzwaScene';
 import Phaser from 'phaser';
 import UIScene from './scenes/uiscene';
 import transitionScene from './scenes/transitionScene';
+import storeScene from './scenes/storeScene';
 import FinalScene from './scenes/FinalScene';
 import victoryScene from './scenes/victoryScene';
 
@@ -28,11 +29,11 @@ const GameComponent = () => {
                 arcade: { gravity: { y: 0 } }
             },
             audio: {
-                disableWebAudio: false, // Keep Web Audio enabled
+   // Keep Web Audio enabled
                 noAudio: false,
                 contextResume: true // Allow context resuming
             },
-        scene: [StartScene,StoryPanelScene,tanyaradzwaScene,GameScene,UIScene,transitionScene,FinalScene,GameOverScene,victoryScene],
+        scene: [StartScene,StoryPanelScene,tanyaradzwaScene,storeScene,FinalScene,GameOverScene,victoryScene],
       
             parent: 'game-container' // Matches the div below
         };

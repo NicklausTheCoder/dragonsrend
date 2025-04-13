@@ -8,8 +8,9 @@ class FinalScene extends Phaser.Scene {
     constructor() {
         super('FinalScene'); // This string MUST match what you use in scene.start()
         this.gameSpeed = 2; // Pixels per frame to move
-
+        this.countdownValue = 20;
         this.fireRate = 500;
+        this.shootingAnimatus ='bullets';
     }
     dragonHealth = 400;
     background2;
@@ -20,12 +21,15 @@ class FinalScene extends Phaser.Scene {
 
 
 
-            this.load.image('finalsky', `mergedimages.png`);
-     
+        this.load.image('finalsky', `sky.png`);
 
+        this.load.image('laser', `laser.png`);
+        this.load.image('laser1', `laser.png`);
+        
+        this.load.image('laser2', `laser.png`);
         this.load.image('plane1', 'plane1.png');
         this.load.image('plane2', 'plane2.png');
-
+        this.load.image('ad', 'ad.jpg');
         this.load.image('finalDragon1', 'ultimatedragon1.png');
         this.load.image('finalDragon2', 'ultimatedragon2.png');
         this.load.image('finalDragon3', 'ultimatedragon3.png');
@@ -51,9 +55,14 @@ class FinalScene extends Phaser.Scene {
 
     create() {
         // Background
-
-        this.background = this.add.tileSprite(0, 0, 1600, 700, 'finalsky');
-        this.background.setOrigin(0, 0);
+        const gameWidth = this.scale.width;
+        const gameHeight = this.scale.height;
+        this.background = this.add.tileSprite(0, 0, gameWidth, gameHeight, 'finalsky')
+            .setOrigin(0, 0)
+            .setScrollFactor(0);
+        const bgTexture = this.textures.get('finalsky');
+        const bgAspect = bgTexture.source[0].width / bgTexture.source[0].height;
+        const gameAspect = gameWidth / gameHeight;
 
         // milliseconds between shots
         this.startAutoFire();
@@ -73,7 +82,7 @@ class FinalScene extends Phaser.Scene {
 
 
 
- 
+
         this.plane = this.add.sprite(45, 300, 'plane1');
         this.dragon = this.physics.add.sprite(this.cameras.main.width * 0.75, // Start at 75% of screen width (right side)
             this.cameras.main.height / 2, 'finalDragon1');
@@ -81,7 +90,12 @@ class FinalScene extends Phaser.Scene {
         this.dragon.setScale(1);
         this.dragon.setCollideWorldBounds(true);
         this.dragon.setFlipX(true);
-
+        this.adState = {
+            lastShown: 0,
+            cooldown: 30000, // 30 seconds cooldown (ms)
+            available: true
+        };
+    
         // Animations
         this.anims.create({
             key: 'fly',
@@ -145,6 +159,23 @@ class FinalScene extends Phaser.Scene {
             repeat: -1
         });
 
+        this.anims.create({
+            key: 'laserAnim',
+            frames: [
+                { key: 'laser1' },
+                { key: 'laser2' }
+            ],
+            frameRate: 15,
+            repeat: -1
+        });
+
+        this.upgradeToLaser = function() {
+            this.shootingAnimatus = 'laser';
+            
+   
+            // Call this after showing ad
+        };
+        
         // Touch controls
         this.input.addPointer(1);
         this.touchY = 300;
@@ -186,7 +217,7 @@ class FinalScene extends Phaser.Scene {
         this.dragonBullets = this.physics.add.group({
             defaultKey: 'fireball1',
             classType: Phaser.Physics.Arcade.Sprite,
-            maxSize: 50,
+            maxSize: 200,
             runChildUpdate: true,
             createCallback: bullet => {
                 this.physics.add.existing(bullet);
@@ -259,6 +290,54 @@ class FinalScene extends Phaser.Scene {
             .setScale(0.1); // Adjust size
 
 
+        this.add.rectangle(0, 0, this.cameras.main.width, this.cameras.main.height)
+            .setStrokeStyle(2, 0xff0000)
+            .setOrigin(0)
+            .setDepth(9999);
+
+
+        const buttonGroup = this.add.container(
+            this.cameras.main.width - 100, // Example position
+            80
+        ).setScrollFactor(0)
+            .setInteractive() // Make it clickable
+            .setScrollFactor(0) // Stays fixed on screen
+            .setDepth(1000) // Always on top
+            .setScale(0.6);
+
+        // 2. Create button and verify
+        const laserButton = this.add.sprite(0, 0, 'laser')
+            .setInteractive({ useHandCursor: true })
+            .setScale(0.7);
+
+        if (!laserButton) {
+            console.error("Laser button creation failed!");
+            return;
+        }
+        const getLaseradText = this.add.text(0, -40, 'AD', {
+            font: '18px Arial',
+            fill: '#FF0000FF'
+        }).setOrigin(0.5);
+        // 3. Create text elements
+        const getLaserText = this.add.text(0, 40, 'Get Laser', {
+            font: '18px Arial',
+            fill: '#FF0808FF'
+        }).setOrigin(0.5);
+
+        // 4. Add to container
+        buttonGroup.add([laserButton, getLaseradText, getLaserText]);
+
+        // 5. Verify container before adding listener
+        if (buttonGroup) {
+            buttonGroup.on('pointerdown', () => {
+                console.log("Button clicked!");
+                // Your click handler here
+            });
+        } else {
+            console.error("Button group creation failed!");
+        }
+
+
 
 
         this.physics.add.overlap(
@@ -297,7 +376,11 @@ class FinalScene extends Phaser.Scene {
         });
 
         // Create rocket group
-
+        // Handle events for the entire group
+        laserButton.on('pointerdown', () => {
+            // Handle button click
+            this.showAdForLaser();
+        });
         // Button glow effect
         this.buttonGlow = this.add.graphics()
             .fillStyle(0xffff00, 0.15)
@@ -323,22 +406,219 @@ class FinalScene extends Phaser.Scene {
 
 
         // Create initial hearts
-  this.createHearts()
+        this.createHearts()
 
 
     }
-    createHearts() {
-        this.hearts = this.add.group();
+
+    showAdForLaser() {
+        // Check cooldown
+        const now = Date.now();
+        if (now - this.adState.lastShown < this.adState.cooldown) {
+            const remaining = Math.ceil((this.adState.cooldown - (now - this.adState.lastShown)) / 1000);
+            this.showMessage(`Please wait ${remaining} seconds`, 0xff0000);
+            return;
+        }
+    
+        // Check availability
+        if (!this.adState.available) {
+            this.showMessage("Ads not available", 0xff0000);
+            return;
+        }
+    
+        // Pause game
+        this.gamePaused = true;
+        this.physics.pause();
+       
+    
+        // Show ad UI
+        this.createAdPopup();
+    
+        // Simulate ad completion after 3 seconds
+        this.time.delayedCall(30000, () => {
+            this.handleAdComplete();
+        }, null, this);
+    }
+    
+    createAdPopup() {
+        // Dim background
+        this.adOverlay = this.add.rectangle(
+            this.cameras.main.centerX,
+            this.cameras.main.centerY,
+            this.cameras.main.width,
+            this.cameras.main.height,
+            0x000000,
+            0.7
+        ).setScrollFactor(0).setDepth(999);
+    
+        // Popup container
+        this.adPopup = this.add.container(
+            this.cameras.main.centerX,
+            this.cameras.main.centerY
+        ).setDepth(1001);
+    
+        // Popup background
+        const popupBg = this.add.rectangle(0, 0, 400, 330, 0x1a2c42)
+            .setStrokeStyle(2, 0xffffff);
+    
+        // Ad content
+        const loadingText = this.add.image(0, -50, 'ad').setScale(0.31).setInteractive().setOrigin(0.5);
+    
+        // Order button
+    // Handle the click/tap
+loadingText.on('pointerdown', () => {
+    // Open Coca-Cola website in new tab
+    window.open('https://www.coca-cola.com', '_blank');
+    
+    // Optional: Add click sound
+
+});
+    
+        // Countdown text - make sure it's visible (set depth higher than background)
+        this.countdownText = this.add.text(0, 100, 'close button will appear in : 20', {
+            font: '20px Arial',
+            fill: '#ffffff'
+        }).setOrigin(0.5).setDepth(1002);
+    
+        // Add elements to container
+        this.adPopup.add([popupBg, loadingText, this.countdownText]);
+    
+        // Initialize countdown
+     
         
-        for (let i = 0; i < this.playerMaxHealth; i++) {
-            this.hearts.add(
-                this.add.sprite(20 + (i * 40),      this.cameras.main.height - 50 , 'heart')
-                .setScrollFactor(0)
-                .setScale(0.06)
-                .setDepth(1000));
+        // Start the timer
+        this.startCountdown();
+    }
+    
+    startCountdown() {
+        // Remove any existing timer first
+        if (this.timerEvent) {
+            this.timerEvent.remove();
+        }
+    
+        console.log("Starting countdown timer"); // Debug log
+        console.log("Countdown:", this.countdownValue)
+        
+        this.timerEvent = this.time.addEvent({
+            delay: 1000, // 1 second
+            callback: this.updateCountdown,
+            callbackScope: this,
+            loop: true
+        });
+    }
+    
+    updateCountdown() {
+        this.countdownValue--;
+        console.log("Countdown:", this.countdownValue); // Debug log
+        
+        // Update the text
+        this.countdownText.setText('close button will appear in :' + this.countdownValue);
+        
+        // When countdown reaches 0
+        if (this.countdownValue <= 0) {
+            this.showSkipButton();
         }
     }
     
+    showSkipButton() {
+        console.log("Showing skip button"); // Debug log
+        
+        // Remove countdown text
+        this.countdownText.destroy();
+        
+        // Create and add skip button
+        this.skipButton = this.add.text(100, 100, 'Close Ad', {
+            font: '24px Arial',
+            fill: '#ff5555'
+        }).setOrigin(0.5).setInteractive().setDepth(1002);
+        
+        this.adPopup.add(this.skipButton);
+        
+        // Add click handler
+        this.skipButton.on('pointerdown', () => {
+            console.log("Skip button clicked"); // Debug log
+            this.handleAdComplete();
+            this.cleanupAdPopup();
+        });
+        
+        // Stop the timer
+        this.timerEvent.remove();
+    }
+    
+    cleanupAdPopup() {
+        console.log("Cleaning up ad popup"); // Debug log
+        
+        // Cleanup all references
+        if (this.adOverlay) this.adOverlay.destroy();
+        if (this.adPopup) this.adPopup.destroy();
+        if (this.timerEvent) this.timerEvent.destroy();
+        if (this.countdownText && this.countdownText.active) this.countdownText.destroy();
+        if (this.skipButton && this.skipButton.active) this.skipButton.destroy();
+        
+        // Null all references
+        this.adOverlay = null;
+        this.adPopup = null;
+        this.timerEvent = null;
+        this.countdownText = null;
+        this.skipButton = null;
+    }
+    handleAdComplete() {
+        // Reward player
+   
+        // Update ad state
+        this.adState.lastShown = Date.now();
+        this.adState.available = false; // Temporary lock to prevent spam
+    this.shootinganimatus='laser';
+        // Resume game
+        this.gamePaused = false;
+        this.physics.resume();
+        this.time.paused = false;
+    
+        // Show reward message
+        this.showMessage("+50 Coins!", 0x00ff00);
+    
+        // Re-enable ads after short delay
+        this.time.delayedCall(5000, () => {
+            this.adState.available = true;
+        }, null, this);
+    
+        // Cleanup
+        this.cleanupAdPopup();
+    }
+    
+
+    showMessage(text, color = 0xffffff) {
+        const msg = this.add.text(
+            this.cameras.main.centerX,
+            this.cameras.main.centerY - 200,
+            text,
+            {
+                font: '28px Arial',
+                fill: Phaser.Display.Color.IntegerToColor(color).rgba,
+                backgroundColor: '#000000',
+                padding: { x: 20, y: 10 }
+            }
+        ).setOrigin(0.5).setDepth(1002);
+    
+        this.tweens.add({
+            targets: msg,
+            alpha: 0,
+            duration: 2000,
+            onComplete: () => msg.destroy()
+        });
+    }
+    createHearts() {
+        this.hearts = this.add.group();
+
+        for (let i = 0; i < this.playerMaxHealth; i++) {
+            this.hearts.add(
+                this.add.sprite(20 + (i * 40), this.cameras.main.height - 50, 'heart')
+                    .setScrollFactor(0)
+                    .setScale(0.06)
+                    .setDepth(1000));
+        }
+    }
+
     updateHearts() {
         this.hearts.getChildren().forEach((heart, index) => {
             // Show full heart if index < current health
@@ -347,7 +627,7 @@ class FinalScene extends Phaser.Scene {
             }
             // Show empty heart (or hide) if health is depleted
             else {
-                 heart.setVisible(false)
+                heart.setVisible(false)
             }
         });
     }
@@ -443,13 +723,13 @@ class FinalScene extends Phaser.Scene {
             this.time.delayedCall(300, () => {
                 dragonBullets.clearTint();
             });
-          plane.destroy(); 
+            plane.destroy();
 
 
 
             // Check for game over
             if (this.playerHealth <= 0) {
-              
+
                 this.startGameOver(dragonBullets);
             }
         }
@@ -466,7 +746,7 @@ class FinalScene extends Phaser.Scene {
     DragonRam(dragon, plane) {
 
 
-       
+
         // Player hit effect
 
 
@@ -485,13 +765,13 @@ class FinalScene extends Phaser.Scene {
             this.time.delayedCall(300, () => {
                 plane.clearTint();
             });
-  
+
 
 
 
             // Check for game over
             if (this.playerHealth <= 0) {
-              
+
                 this.startGameOver(plane);
             }
         }
@@ -545,7 +825,7 @@ class FinalScene extends Phaser.Scene {
             frameRate: 10,
             repeat: -1
         });
-  
+
 
         // 3. Play explosion animation
         explosion.play('explode'); // Set up this animation in create()
@@ -654,6 +934,8 @@ class FinalScene extends Phaser.Scene {
         }
     }
     fireBullet() {
+
+        
         const bullet = this.dragonBullets.get();
         if (bullet) {
             bullet.setActive(true)
@@ -836,16 +1118,16 @@ class FinalScene extends Phaser.Scene {
             });
         });
 
-        
+
         this.time.delayedCall(700, () => {
-       this.cameras.main.fadeOut(500, 0, 0, 0); // Fade out effect
-            
+            this.cameras.main.fadeOut(500, 0, 0, 0); // Fade out effect
+
             // After fade completes, switch scene
             this.cameras.main.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () => {
                 this.scene.start('victoryScene');
             });
-        // Your b
-    });
+            // Your b
+        });
     }
     startDragonMovement() {
         // Clear existing timer if any
@@ -973,30 +1255,40 @@ class FinalScene extends Phaser.Scene {
     fireBullet() {
         const bullet = this.bullets.get(this.plane.x + 40, this.plane.y);
 
-        if (bullet) {
-            // Reset bullet properties
-            bullet.setActive(true)
-                .setVisible(true)
-                .setPosition(this.plane.x + 40, this.plane.y)
-                .setVelocityX(500); // Set velocity here instead of createCallback
-
-            // Play animation on THIS bullet
-            bullet.play('bulletAnim');
-
-            // Muzzle flash effect (optional)
-            const flash = this.add.sprite(this.plane.x + 20, this.plane.y, 'bullet1')
-                .setScale(1)
-                .setAlpha(0.8)
-                .setDepth(0);
-
-            this.tweens.add({
-                targets: flash,
-                scale: 0.5,
-                alpha: 0,
-                duration: 100,
-                onComplete: () => flash.destroy()
-            });
+        if (!bullet) return; // No available bullets
+        
+        if (this.shootingAnimatus === 'laser') {
+            bullet.setTexture('laser1'); // Set laser sprite
+            bullet.play('laserAnim'); // Play laser animation
+            bullet.damage = 2; // Laser does more damage
+        } else {
+            console.log(this.shootingAnimatus);
+            if (bullet) {
+                // Reset bullet properties
+                bullet.setActive(true)
+                    .setVisible(true)
+                    .setPosition(this.plane.x + 40, this.plane.y)
+                    .setVelocityX(500); // Set velocity here instead of createCallback
+    
+                // Play animation on THIS bullet
+                bullet.play('bulletAnim');
+    
+                // Muzzle flash effect (optional)
+                const flash = this.add.sprite(this.plane.x + 20, this.plane.y, 'bullet1')
+                    .setScale(1)
+                    .setAlpha(0.8)
+                    .setDepth(0);
+    
+                this.tweens.add({
+                    targets: flash,
+                    scale: 0.5,
+                    alpha: 0,
+                    duration: 100,
+                    onComplete: () => flash.destroy()
+                });
+            }
         }
+
     }
 
 }
